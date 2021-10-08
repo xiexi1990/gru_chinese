@@ -1,0 +1,16 @@
+remove_dist_th = 25
+remove_ang_th = 0.94
+lb_total = 3
+nclass = 5
+noise_prob = 0.5
+noise_ratio = 0.15
+drop = 0.02
+repeat = 30
+units = 512
+in_tanh_dim = 256
+M = 24
+steps_per_epoch = 5000
+epochs = 100
+pot_files_path = "e:/tf_projects/Pot1.1Train/"
+data_path = "data/"
+checkpoint_path = "ckp_u_" + str(units) + "_intan_" + str(in_tanh_dim) + "_n_" + str(nclass) + "_M_" + str(M) + "/"
