@@ -25,9 +25,30 @@ mae_metric = keras.metrics.MeanAbsoluteError(name="mae")
 if True:
     model = construct_model(units, in_tanh_dim, nclass, False, M, [None, None, 6])
     model.compile(loss=Loss, optimizer=keras.optimizers.Adam())
-    # model.load_weights(tf.train.latest_checkpoint(checkpoint_path))
+    model.load_weights(tf.train.latest_checkpoint(checkpoint_path))
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path + 'ck_{epoch}', save_weights_only=True)
-    model.fit(take_batches, steps_per_epoch=steps_per_epoch, epochs=epochs, callbacks=[checkpoint_callback])
+
+    # for ___i in range(1000):
+    #     if ___i % 10 == 0:
+    #         print(___i)
+    #     a = take_batches.as_numpy_iterator().__next__()
+    #     if(tf.reduce_any(tf.math.is_nan(a[0]))):
+    #         print("a[0] contains nan")
+    #     loss = Loss(a[1], model.predict(a[0]))
+    #     if tf.reduce_any(tf.math.is_nan(loss)):
+    #         print("loss contains nan")
+    #     # for __i in range(len(x)):
+    #     #     pred = model.predict(tf.cast(x[__i], tf.float32))
+    #     #     if tf.reduce_any(tf.math.is_nan(pred)):
+    #     #         print("pred contains nan")
+    #     #     loss = Loss(tf.cast(y[__i], tf.float32), pred)
+    #     #     if tf.reduce_any(tf.math.is_nan(loss)):
+    #     #         print("loss contains nan")
+    #
+    # exit()
+
+
+    model.fit(take_batches, steps_per_epoch=steps_per_epoch, epochs=epochs, initial_epoch=3, callbacks=[checkpoint_callback])
 
 else:
     # draw_real_char(5)

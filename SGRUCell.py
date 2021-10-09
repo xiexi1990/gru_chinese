@@ -31,6 +31,12 @@ class SGRUCell(DropoutRNNCellMixin, keras.layers.Layer):
         self.bias = self.add_weight(shape=(self.units*4), initializer='zeros', name='bias')
         self.built = True
     def call(self, inputs, states, training):
+        # if (training == True) and tf.reduce_all(tf.math.is_nan(states)):
+        #     raise Exception("SGRUCell: states contains nan")
+        # if (training == True) and tf.reduce_all(tf.math.is_nan(inputs)):
+        #     tf.print(inputs)
+        #     raise Exception("SGRUCell: inputs contains nan")
+        assert not tf.reduce_any(tf.math.is_nan(inputs))
         h_tm1 = states[0] if nest.is_sequence(states) else states  # previous memory
         d = inputs[:, 0:2]
         s = inputs[:, 2:5]

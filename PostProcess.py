@@ -12,13 +12,18 @@ class PostProcess(keras.layers.Layer):
         self.bsoftmax = self.add_weight(shape=(3), initializer='zeros', name='bsoftmax')
         self.built = True
     def call(self, inputs, **kwargs):
+        # if tf.reduce_any(tf.math.is_nan(inputs)):
+        #     tf.print(inputs)
+          #  raise Exception("PostProcess: inputs contains nan")
+        assert not tf.reduce_any(tf.math.is_nan(inputs))
         R5M = tf.matmul(inputs, self.Wgmm) + self.bgmm
         _pi = R5M[:, :, :self.M]
         pi = tf.exp(_pi) / tf.reduce_sum(tf.exp(_pi), axis=-1, keepdims=True)
         mux = R5M[:, :, self.M:self.M * 2]
         muy = R5M[:, :, self.M * 2:self.M * 3]
-        sigmax = tf.exp(R5M[:, :, self.M * 3:self.M * 4])
-        sigmay = tf.exp(R5M[:, :, self.M * 4:])
+        eps = 1e-10
+        sigmax = tf.exp(R5M[:, :, self.M * 3:self.M * 4]) + eps
+        sigmay = tf.exp(R5M[:, :, self.M * 4:]) + eps
         R3 = tf.matmul(inputs, self.Wsoftmax) + self.bsoftmax
         p = tf.exp(R3) / tf.reduce_sum(tf.exp(R3), axis=-1, keepdims=True)
         return tf.concat([pi, mux, muy, sigmax, sigmay, p], axis=-1)
