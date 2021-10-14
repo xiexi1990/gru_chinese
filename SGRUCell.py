@@ -9,16 +9,14 @@ def exp_safe(x):
    # return tf.exp(x)
 
 class SGRUCell(AbstractRNNCell, keras.layers.Layer):
-    def __init__(self, units, nclass, tanh_dim, **kwargs):
+    def __init__(self, units, nclass, tanh_dim, M, **kwargs):
         super(SGRUCell, self).__init__(**kwargs)
         self.units = units
         self.nclass = nclass
         self.tanh_dim = tanh_dim
+        self.M = M
     @property
     def state_size(self):
-        return self.units + 5
-    @property
-    def output_size(self):
         return self.units + 5
 
     def build(self, input_shape):
@@ -35,8 +33,8 @@ class SGRUCell(AbstractRNNCell, keras.layers.Layer):
         self.kernel_s = self.add_weight(shape=(self.tanh_dim, self.units * 4), initializer='glorot_uniform', name='kernel_s')
         self.bias = self.add_weight(shape=(self.units * 3), initializer='zeros', name='bias')
 
-        self.Wpred = self.add_weight(shape=(self.units, 2), initializer='glorot_uniform', name='Wpred')
-        self.bpred = self.add_weight(shape=(2), initializer='zeros', name='bpred')
+        self.Wgmm = self.add_weight(shape=(self.units, self.M * 5), initializer='glorot_uniform', name='Wgmm')
+        self.bgmm = self.add_weight(shape=(self.M * 5), initializer='zeros', name='bgmm')
 
         self.Wsoftmax = self.add_weight(shape=(self.units, 3), initializer='glorot_uniform', name='Wsoftmax')
         self.bsoftmax = self.add_weight(shape=(3), initializer='zeros', name='bsoftmax')
@@ -80,17 +78,27 @@ class SGRUCell(AbstractRNNCell, keras.layers.Layer):
                        + tf.matmul(_s, self.kernel_s[:, self.units * 3:])
                        + self.bias[self.units * 2:])
 
-        xy_pred = tf.matmul(o, self.Wpred) + self.bpred
+        R5M = tf.matmul(o, self.Wgmm) + self.bgmm
+        _pi = R5M[:, :self.M]
+        pi = exp_safe(_pi) / tf.reduce_sum(exp_safe(_pi), axis=-1, keepdims=True)
+        mux = R5M[:, self.M:self.M * 2]
+        muy = R5M[:, self.M * 2:self.M * 3]
+        sigmax = exp_safe(R5M[:, self.M * 3:self.M * 4])
+        sigmay = exp_safe(R5M[:, self.M * 4:])
+
+
         R3 = tf.matmul(o, self.Wsoftmax) + self.bsoftmax
         p = exp_safe(R3) / tf.reduce_sum(exp_safe(R3), axis=-1, keepdims=True)
 
-        __pred = tf.concat([xy_pred, p], axis=-1)
-        __h = tf.concat([h, __pred], axis=-1)
-        __o = tf.concat([o, __pred], axis=-1)
+        x_pred = tf.reduce_sum(pi * mux, axis=-1, keepdims=True)
+        y_pred = tf.reduce_sum(pi * muy, axis=-1, keepdims=True)
+
+        __o = tf.concat([pi, mux, muy, sigmax, sigmay, x_pred, y_pred, p], axis=-1)
+        __h = tf.concat([h, x_pred, y_pred, p], axis=-1)
 
         new_state = [__h] if nest.is_sequence(states) else __h
         return __o, new_state
     def get_config(self):
         config = super(SGRUCell, self).get_config()
-        config.update({'units': self.units, 'nclass': self.nclass, 'tanh_dim': self.tanh_dim})
+        config.update({'units': self.units, 'nclass': self.nclass, 'tanh_dim': self.tanh_dim, "M": self.M})
         return config

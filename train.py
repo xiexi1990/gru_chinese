@@ -7,7 +7,6 @@ from model import construct_model
 import settings as ss
 from Loss import Loss
 from SGRUCell import SGRUCell
-from PostProcess import PostProcess
 from draw_chars import draw_chars
 
 tf.random.set_seed(123)
@@ -78,14 +77,12 @@ if True:
             draw_chars(x, y, self.model2, [0, 1, 2, 3, 4], 50, False, self.ckp_path + 'epoch_' + str(epoch + 1))
 
 
-    rnn_cell = SGRUCell(units=ss.units, nclass=ss.nclass, tanh_dim=ss.tanh_dim)
+    rnn_cell = SGRUCell(units=ss.units, nclass=ss.nclass, tanh_dim=ss.tanh_dim, M=ss.M)
 
     rnn_layer = tf.keras.layers.RNN(rnn_cell, return_state=False, return_sequences=True, stateful=False)
-    postprocess = PostProcess(M=ss.M)
 
     inputs = keras.Input(batch_shape=[None, None, 1])
-    rnn_out = rnn_layer(inputs)
-    outputs = postprocess(rnn_out)
+    outputs = rnn_layer(inputs)
     model = CustomModel(inputs, outputs)
 
    # optimizer = keras.optimizers.SGD(lr=0.001, momentum=0.9, nesterov=True)
