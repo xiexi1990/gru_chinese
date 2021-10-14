@@ -1,101 +1,96 @@
 import tensorflow as tf
 import tensorflow.keras as keras
-from tensorflow.python.keras.layers.recurrent import DropoutRNNCellMixin, AbstractRNNCell
+import numpy as np
+from keras.layers import AbstractRNNCell
 from tensorflow.python.util import nest
 
-class SGRUCell(DropoutRNNCellMixin, keras.layers.Layer):
-    def __init__(self, units, in_tanh_dim, nclass, dropout=0., recurrent_dropout=0., **kwargs):
+def exp_safe(x):
+    return tf.clip_by_value(tf.exp(x), clip_value_min=1e-10, clip_value_max=1e10)
+   # return tf.exp(x)
+
+class SGRUCell(AbstractRNNCell, keras.layers.Layer):
+    def __init__(self, units, nclass, tanh_dim, **kwargs):
         super(SGRUCell, self).__init__(**kwargs)
         self.units = units
-        self.in_tanh_dim = in_tanh_dim
         self.nclass = nclass
-        self.dropout = dropout
-        self.recurrent_dropout = recurrent_dropout
+        self.tanh_dim = tanh_dim
     @property
     def state_size(self):
-        return self.units + 2
+        return self.units + 5
     @property
     def output_size(self):
-        return self.units
+        return self.units + 5
+
     def build(self, input_shape):
-        input_dim = input_shape[-1]
-        assert len(input_shape) == 2 and input_dim == 6
-        self.Wd = self.add_weight(shape=(2, self.in_tanh_dim), initializer='glorot_uniform', name='Wd')
-        self.bd = self.add_weight(shape=(self.in_tanh_dim), initializer='zeros', name='bd')
-        self.Ws = self.add_weight(shape=(3, self.in_tanh_dim), initializer='glorot_uniform', name='Ws')
-        self.bs = self.add_weight(shape=(self.in_tanh_dim), initializer='zeros', name='bs')
+        self.Wd = self.add_weight(shape=(2, self.tanh_dim), initializer='glorot_uniform', name='Wd')
+        self.bd = self.add_weight(shape=(self.tanh_dim), initializer='zeros', name='bd')
+        self.Ws = self.add_weight(shape=(3, self.tanh_dim), initializer='glorot_uniform', name='Ws')
+        self.bs = self.add_weight(shape=(self.tanh_dim), initializer='zeros', name='bs')
+
+        self.bias_z = self.add_weight(shape=(self.units), initializer=keras.initializers.constant(0), name='bias_z')
+
         self.recurrent_kernel = self.add_weight(shape=(self.units, self.units * 4), initializer='orthogonal', name='recurrent_kernel')
-        self.kernel_d = self.add_weight(shape=(self.in_tanh_dim, self.units*4), initializer='glorot_uniform', name='kernel_d')
-        self.kernel_s = self.add_weight(shape=(self.in_tanh_dim, self.units*4), initializer='glorot_uniform', name='kernel_s')
         self.kernel_c = self.add_weight(shape=(self.nclass, self.units * 4), initializer='glorot_uniform', name='kernel_c')
-        self.bias = self.add_weight(shape=(self.units*4), initializer='zeros', name='bias')
+        self.kernel_d = self.add_weight(shape=(self.tanh_dim, self.units * 4), initializer='glorot_uniform', name='kernel_d')
+        self.kernel_s = self.add_weight(shape=(self.tanh_dim, self.units * 4), initializer='glorot_uniform', name='kernel_s')
+        self.bias = self.add_weight(shape=(self.units * 3), initializer='zeros', name='bias')
+
+        self.Wpred = self.add_weight(shape=(self.units, 2), initializer='glorot_uniform', name='Wpred')
+        self.bpred = self.add_weight(shape=(2), initializer='zeros', name='bpred')
+
+        self.Wsoftmax = self.add_weight(shape=(self.units, 3), initializer='glorot_uniform', name='Wsoftmax')
+        self.bsoftmax = self.add_weight(shape=(3), initializer='zeros', name='bsoftmax')
+
         self.built = True
     def call(self, inputs, states, training):
-        # if (training == True) and tf.reduce_all(tf.math.is_nan(states)):
-        #     raise Exception("SGRUCell: states contains nan")
-        # if (training == True) and tf.reduce_all(tf.math.is_nan(inputs)):
-        #     tf.print(inputs)
-        #     raise Exception("SGRUCell: inputs contains nan")
         tf.debugging.assert_all_finite(inputs, 'sgrucell inputs ill')
-
         _h_tm1 = states[0] if nest.is_sequence(states) else states  # previous memory
-        h_tm1 = _h_tm1[:, :-2]
-        d = inputs[:, :2] + _h_tm1[:, -2:]
-        s = inputs[:, 2:5]
-        ch = tf.cast(inputs[:, 5], tf.int32)
+        h_tm1 = _h_tm1[:, :-5]
+
+        d = _h_tm1[:, -5:-3]
+        s = _h_tm1[:, -3:]
         _d = tf.tanh(tf.matmul(d, self.Wd) + self.bd)
         _s = tf.tanh(tf.matmul(s, self.Ws) + self.bs)
+
+        ch = tf.cast(inputs[:, 0], tf.int32)
+
         _ch = tf.one_hot(ch, self.nclass)
-        _d_mask = self.get_dropout_mask_for_cell(_d, training, count=3)
-        _s_mask = self.get_dropout_mask_for_cell(_s, training, count=3)
-        rec_dp_mask = self.get_recurrent_dropout_mask_for_cell(h_tm1, training, count=3)
-        if 0. < self.dropout < 1.:
-            _d_z = _d * _d_mask[0]
-            _d_r = _d * _d_mask[1]
-            _d_h = _d * _d_mask[2]
-            _s_z = _s * _s_mask[0]
-            _s_r = _s * _s_mask[1]
-            _s_h = _s * _s_mask[2]
-        else:
-            _d_z = _d
-            _d_r = _d
-            _d_h = _d
-            _s_z = _s
-            _s_r = _s
-            _s_h = _s
-        if 0. < self.recurrent_dropout < 1.:
-            h_tm1_z = h_tm1 * rec_dp_mask[0]
-            h_tm1_r = h_tm1 * rec_dp_mask[1]
-            h_tm1_h = h_tm1 * rec_dp_mask[2]
-        else:
-            h_tm1_z = h_tm1
-            h_tm1_r = h_tm1
-            h_tm1_h = h_tm1
-        z = tf.sigmoid(tf.matmul(h_tm1_z, self.recurrent_kernel[:, :self.units])
-                       + tf.matmul(_d_z, self.kernel_d[:, :self.units])
-                       + tf.matmul(_s_z, self.kernel_s[:, :self.units])
+
+        z = tf.sigmoid(tf.matmul(h_tm1, self.recurrent_kernel[:, :self.units])
                        + tf.matmul(_ch, self.kernel_c[:, :self.units])
-                       + self.bias[:self.units])
-        r = tf.sigmoid(tf.matmul(h_tm1_r, self.recurrent_kernel[:, self.units:self.units * 2])
-                       + tf.matmul(_d_r, self.kernel_d[:, self.units:self.units * 2])
-                       + tf.matmul(_s_r, self.kernel_s[:, self.units:self.units * 2])
+                       + tf.matmul(_d, self.kernel_d[:, :self.units])
+                       + tf.matmul(_s, self.kernel_s[:, :self.units])
+                       + self.bias_z)
+
+        r = tf.sigmoid(tf.matmul(h_tm1, self.recurrent_kernel[:, self.units:self.units * 2])
                        + tf.matmul(_ch, self.kernel_c[:, self.units:self.units * 2])
-                       + self.bias[self.units:self.units * 2])
-        hh = tf.tanh(tf.matmul(r * h_tm1_h, self.recurrent_kernel[:, self.units * 2:self.units * 3])
-                       + tf.matmul(_d_h, self.kernel_d[:, self.units * 2:self.units * 3])
-                       + tf.matmul(_s_h, self.kernel_s[:, self.units * 2:self.units * 3])
+                       + tf.matmul(_d, self.kernel_d[:, self.units:self.units * 2])
+                       + tf.matmul(_s, self.kernel_s[:, self.units:self.units * 2])
+                       + self.bias[:self.units])
+
+        hh = tf.tanh(tf.matmul(r * h_tm1, self.recurrent_kernel[:, self.units * 2:self.units * 3])
                        + tf.matmul(_ch, self.kernel_c[:, self.units * 2:self.units * 3])
-                       + self.bias[self.units * 2:self.units * 3])
+                       + tf.matmul(_d, self.kernel_d[:, self.units * 2:self.units * 3])
+                       + tf.matmul(_s, self.kernel_s[:, self.units * 2:self.units * 3])
+                       + self.bias[self.units * 1:self.units * 2])
         h = z * h_tm1 + (1 - z) * hh
         o = tf.tanh(tf.matmul(h, self.recurrent_kernel[:, self.units * 3:])
-                       + tf.matmul(_d_r, self.kernel_d[:, self.units * 3:])
-                       + tf.matmul(_s_r, self.kernel_s[:, self.units * 3:])
                        + tf.matmul(_ch, self.kernel_c[:, self.units * 3:])
-                       + self.bias[self.units * 3:])
-        __h = tf.concat([h, d], axis=-1)
+                       + tf.matmul(_d, self.kernel_d[:, self.units * 3:])
+                       + tf.matmul(_s, self.kernel_s[:, self.units * 3:])
+                       + self.bias[self.units * 2:])
+
+        xy_pred = tf.matmul(o, self.Wpred) + self.bpred
+        R3 = tf.matmul(o, self.Wsoftmax) + self.bsoftmax
+        p = exp_safe(R3) / tf.reduce_sum(exp_safe(R3), axis=-1, keepdims=True)
+
+        __pred = tf.concat([xy_pred, p], axis=-1)
+        __h = tf.concat([h, __pred], axis=-1)
+        __o = tf.concat([o, __pred], axis=-1)
+
         new_state = [__h] if nest.is_sequence(states) else __h
-        return o, new_state
+        return __o, new_state
     def get_config(self):
         config = super(SGRUCell, self).get_config()
-        config.update({'units': self.units, 'in_tanh_dim': self.in_tanh_dim, 'nclass': self.nclass, 'dropout': self.dropout, 'recurrent_dropout': self.recurrent_dropout})
+        config.update({'units': self.units, 'nclass': self.nclass, 'tanh_dim': self.tanh_dim})
         return config
