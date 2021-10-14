@@ -13,7 +13,7 @@ class SGRUCell(DropoutRNNCellMixin, keras.layers.Layer):
         self.recurrent_dropout = recurrent_dropout
     @property
     def state_size(self):
-        return self.units
+        return self.units + 2
     @property
     def output_size(self):
         return self.units
@@ -36,9 +36,11 @@ class SGRUCell(DropoutRNNCellMixin, keras.layers.Layer):
         # if (training == True) and tf.reduce_all(tf.math.is_nan(inputs)):
         #     tf.print(inputs)
         #     raise Exception("SGRUCell: inputs contains nan")
-        assert not tf.reduce_any(tf.math.is_nan(inputs))
-        h_tm1 = states[0] if nest.is_sequence(states) else states  # previous memory
-        d = inputs[:, 0:2]
+        tf.debugging.assert_all_finite(inputs, 'sgrucell inputs ill')
+
+        _h_tm1 = states[0] if nest.is_sequence(states) else states  # previous memory
+        h_tm1 = _h_tm1[:, :-2]
+        d = inputs[:, :2] + _h_tm1[:, -2:]
         s = inputs[:, 2:5]
         ch = tf.cast(inputs[:, 5], tf.int32)
         _d = tf.tanh(tf.matmul(d, self.Wd) + self.bd)
@@ -90,7 +92,8 @@ class SGRUCell(DropoutRNNCellMixin, keras.layers.Layer):
                        + tf.matmul(_s_r, self.kernel_s[:, self.units * 3:])
                        + tf.matmul(_ch, self.kernel_c[:, self.units * 3:])
                        + self.bias[self.units * 3:])
-        new_state = [h] if nest.is_sequence(states) else h
+        __h = tf.concat([h, d], axis=-1)
+        new_state = [__h] if nest.is_sequence(states) else __h
         return o, new_state
     def get_config(self):
         config = super(SGRUCell, self).get_config()

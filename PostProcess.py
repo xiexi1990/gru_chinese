@@ -1,5 +1,10 @@
 import tensorflow as tf
 import tensorflow.keras as keras
+
+def exp_safe(x):
+    return tf.clip_by_value(tf.exp(x), clip_value_min=1e-10, clip_value_max=1e10)
+   # return tf.exp(x)
+
 class PostProcess(keras.layers.Layer):
     def __init__(self, M, **kwargs):
         super(PostProcess, self).__init__(**kwargs)
@@ -15,17 +20,19 @@ class PostProcess(keras.layers.Layer):
         # if tf.reduce_any(tf.math.is_nan(inputs)):
         #     tf.print(inputs)
           #  raise Exception("PostProcess: inputs contains nan")
-        assert not tf.reduce_any(tf.math.is_nan(inputs))
+        tf.debugging.assert_all_finite(inputs, 'postprocess inputs ill')
+
         R5M = tf.matmul(inputs, self.Wgmm) + self.bgmm
         _pi = R5M[:, :, :self.M]
-        pi = tf.exp(_pi) / tf.reduce_sum(tf.exp(_pi), axis=-1, keepdims=True)
+        pi = exp_safe(_pi) / tf.reduce_sum(exp_safe(_pi), axis=-1, keepdims=True)
         mux = R5M[:, :, self.M:self.M * 2]
         muy = R5M[:, :, self.M * 2:self.M * 3]
-        eps = 1e-10
-        sigmax = tf.exp(R5M[:, :, self.M * 3:self.M * 4]) + eps
-        sigmay = tf.exp(R5M[:, :, self.M * 4:]) + eps
+        #eps = 1e-10
+      #  eps = 0
+        sigmax = exp_safe(R5M[:, :, self.M * 3:self.M * 4])
+        sigmay = exp_safe(R5M[:, :, self.M * 4:])
         R3 = tf.matmul(inputs, self.Wsoftmax) + self.bsoftmax
-        p = tf.exp(R3) / tf.reduce_sum(tf.exp(R3), axis=-1, keepdims=True)
+        p = exp_safe(R3) / tf.reduce_sum(exp_safe(R3), axis=-1, keepdims=True)
         return tf.concat([pi, mux, muy, sigmax, sigmay, p], axis=-1)
     def get_config(self):
         config = super(PostProcess, self).get_config()

@@ -2,16 +2,8 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
 from model import construct_model
-from settings import *
+import settings as ss
 import pickle
-
-# config = tf.compat.v1.ConfigProto()
-# config.gpu_options.allow_growth=True
-sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.45)))
-tf.compat.v1.keras.backend.set_session(sess)
-
-with open(data_path + "x_y_lb_n_" + str(nclass) + "_r_" + str(repeat) + "_dist_" + str(remove_dist_th) + "_ang_" + str(remove_ang_th) + "_drop_" + str(drop) + "_np_" + str(noise_prob) + "_nr_" + str(noise_ratio), 'rb') as f:
-    x, y = pickle.load(f)
 
 def draw_real_char(ch):
     fig1 = plt.figure()
@@ -36,7 +28,7 @@ def draw_real_char(ch):
                     real_cur_y = real_next_y
     plt.show()
 
-def draw_chars(model, classes, maxlen):
+def draw_chars(x, model, classes, maxlen, ifshow, fname):
     fig = plt.figure()
     ch_cnt = 1
     for ch in classes:
@@ -71,22 +63,23 @@ def draw_chars(model, classes, maxlen):
 
         while pnt_cnt < maxlen:
             pred = np.squeeze(model(pnt_in))
-            pi, mux, muy, sigmax, sigmay = np.split(pred[:M * 5], 5, axis=-1)
-            p = pred[M * 5:]
+            pi, mux, muy, sigmax, sigmay = np.split(pred[:ss.M * 5], 5, axis=-1)
+            p = pred[ss.M * 5:]
 
             sum_choose = True
             N_choose = 0
             if sum_choose:
                 r1 = np.random.rand()
                 sum = 0
-                for i in range(M):
+                for i in range(ss.M):
                     sum += pi[i]
                     if sum > r1:
                         N_choose = i
                         break
+                [x_pred, y_pred] = np.random.multivariate_normal([mux[N_choose], muy[N_choose]], [[np.square(sigmax[N_choose]), 0], [0, np.square(sigmay[N_choose])]])
             else:
                 N_choose = np.argmax(pi)
-            [x_pred, y_pred] = np.random.multivariate_normal([mux[N_choose], muy[N_choose]],[[np.square(sigmax[N_choose]), 0], [0, np.square(sigmay[N_choose])]])
+                [x_pred, y_pred] = [mux[N_choose], muy[N_choose]]
 
             s_pred = np.zeros(3)
             S_choose = 0
@@ -111,15 +104,29 @@ def draw_chars(model, classes, maxlen):
             cur_x = next_x
             cur_y = next_y
             pnt_in[0, 0, 0] = x_pred
+            #print(x_pred)
             pnt_in[0, 0, 1] = y_pred
             pnt_in[0, 0, 2:5] = s_pred
             pnt_cnt += 1
         ch_cnt += 1
-    plt.show()
+
+    if ifshow:
+        plt.show()
+    else:
+        plt.savefig(fname)
 
 # draw_real_char(2)
 # exit()
 
-model = construct_model(units, in_tanh_dim, nclass, True, M, [1, 1, 6])
-model.load_weights(tf.train.latest_checkpoint(checkpoint_path))
-draw_chars(model, [0, 1, 2, 3, 4], 100)
+# config = tf.compat.v1.ConfigProto()
+# config.gpu_options.allow_growth=True
+if False:
+    sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.45)))
+    tf.compat.v1.keras.backend.set_session(sess)
+
+    with open(ss.data_path + "x_y_lb_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), 'rb') as f:
+        x, y = pickle.load(f)
+
+    model = construct_model(ss.units, ss.in_tanh_dim, ss.nclass, True, ss.M, [1, 1, 6])
+    model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
+    draw_chars(x, model, [0, 1, 2, 3, 4], 50, True, 'testfig')
