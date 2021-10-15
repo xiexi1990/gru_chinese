@@ -7,15 +7,16 @@ from model import construct_model
 import settings as ss
 from Loss import Loss
 from SGRUCell import SGRUCell
+from PostProcess import PostProcess
 from draw_chars import draw_chars
 
 tf.random.set_seed(123)
 np.random.seed(1234)
 
-with open(ss.data_path + "x_y_lb_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), 'rb') as f:
+with open(ss.data_path + "x_y_lb2_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), 'rb') as f:
     x, y = pickle.load(f)
 
-dataset = tf.data.Dataset.from_generator(lambda: iter(zip(x, y)), output_types=(tf.float32, tf.float32),output_shapes=([None, None, 1], [None, None, 5]))
+dataset = tf.data.Dataset.from_generator(lambda: iter(zip(x, y)), output_types=(tf.float32, tf.float32),output_shapes=([None, None, 6], [None, None, 5]))
 take_batches = dataset.repeat().shuffle(10000)
 
 sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.45)))
@@ -77,12 +78,13 @@ if True:
             draw_chars(x, y, self.model2, [0, 1, 2, 3, 4], 50, False, self.ckp_path + 'epoch_' + str(epoch + 1))
 
 
-    rnn_cell = SGRUCell(units=ss.units, nclass=ss.nclass, tanh_dim=ss.tanh_dim, M=ss.M)
-
+    rnn_cell = SGRUCell(units=ss.units, nclass=ss.nclass, tanh_dim=ss.tanh_dim)
     rnn_layer = tf.keras.layers.RNN(rnn_cell, return_state=False, return_sequences=True, stateful=False)
+    postprocess = PostProcess(M=ss.M)
 
-    inputs = keras.Input(batch_shape=[None, None, 1])
-    outputs = rnn_layer(inputs)
+    inputs = keras.Input(batch_shape=[None, None, 6])
+    gru_out = rnn_layer(inputs)
+    outputs = postprocess(gru_out)
     model = CustomModel(inputs, outputs)
 
    # optimizer = keras.optimizers.SGD(lr=0.001, momentum=0.9, nesterov=True)
@@ -90,7 +92,7 @@ if True:
   #  model.compile(optimizer=optimizer)
 
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=ss.checkpoint_path + 'ck_{epoch}', save_weights_only=True)
-    custom_callback = CustomCallback(construct_model(ss.units, ss.nclass, ss.tanh_dim, ss.M, True, [1, 1, 1]), ss.checkpoint_path)
+    custom_callback = CustomCallback(construct_model(ss.units, ss.nclass, ss.tanh_dim, ss.M, True, [1, 1, 6]), ss.checkpoint_path)
     model.run_eagerly = False
  #   model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
     model.fit(take_batches, steps_per_epoch=ss.steps_per_epoch, epochs=ss.epochs, initial_epoch=0,
