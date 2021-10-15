@@ -14,27 +14,35 @@ i = 0
 for i in range(ss.nclass):
     char = lb2[i]
     for j in range(ss.repeat):
- #       cx = [np.append(np.append((np.random.rand(2)-0.5)/100.0, [0,1,0]), i)]
-        cx = [np.append(np.zeros(5), i)]
         k = 0
         first = True
-        while k < np.size(char[2], 0) - 1:
-            p = np.append(np.append(char[2][k], char[3][k]), i)
+        sum_p1 = np.zeros(2)
+        cx = [np.concatenate([np.zeros(5, dtype=np.float), [i]])]
+        for k in range(np.size(char[2], 0)):
+            if k > 100:
+                pass
+            p1 = char[2][k]
+            p2 = char[3][k]
+
             if random.random() < ss.drop:
-                if p[2] == 1:
-                    p[2] = 0
-                    p[3] = 1
+                if p2[0] == 1:
+                    p2[0] = 0
+                    p2[1] = 1
             if random.random() < ss.noise_prob:
-                p[0] *= 1 + (random.random() - 0.5) * 2 * ss.noise_ratio
-                p[1] *= 1 + (random.random() - 0.5) * 2 * ss.noise_ratio
+                p1[0] *= 1 + (random.random() - 0.5) * 2 * ss.noise_ratio
+                p1[1] *= 1 + (random.random() - 0.5) * 2 * ss.noise_ratio
+
+            sum_p1 = sum_p1 + p1
             if first:
                 first = False
-                cy = [p]
+                cx = np.append(cx, [np.concatenate([p1, p2, [i]])], 0)
+                cy = [np.concatenate([p1, p2])]
+            elif k == np.size(char[2], 0) - 1:
+                cy = np.append(cy, [np.concatenate([p1, p2])], 0)
             else:
-                cy = np.append(cy, [p], 0)
-            cx = np.append(cx, [p], 0)
-            k += 1
-        cy = np.append(cy, [np.append(np.append(char[2][k], char[3][k]), i)], 0)
+                cx = np.append(cx, [np.concatenate([p1, p2, [i]])], 0)
+                cy = np.append(cy, [np.concatenate([p1, p2])], 0)
+
         x.append(cx)
         y.append(cy)
 
@@ -61,5 +69,5 @@ while i < x.__len__():
     batchx.append(xb)
     batchy.append(yb)
 
-with open(ss.data_path + "x_y_lb3_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), "wb") as f:
+with open(ss.data_path + "x_y_lb2_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), "wb") as f:
     pickle.dump((batchx, batchy), f)

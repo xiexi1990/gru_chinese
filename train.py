@@ -13,7 +13,7 @@ from draw_chars import draw_chars
 tf.random.set_seed(123)
 np.random.seed(1234)
 
-with open(ss.data_path + "x_y_lb_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), 'rb') as f:
+with open(ss.data_path + "x_y_lb3_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), 'rb') as f:
     x, y = pickle.load(f)
 
 dataset = tf.data.Dataset.from_generator(lambda: iter(zip(x, y)), output_types=(tf.float32, tf.float32),output_shapes=([None, None, 6], [None, None, 6]))
@@ -97,8 +97,8 @@ if True:
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=ss.checkpoint_path + 'ck_{epoch}', save_weights_only=True)
     custom_callback = CustomCallback(construct_model(ss.units, ss.in_tanh_dim, ss.nclass, True, ss.M, [1, 1, 6]), ss.checkpoint_path)
     model.run_eagerly = False
-  #  model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
-    model.fit(take_batches, steps_per_epoch=ss.steps_per_epoch, epochs=ss.epochs, initial_epoch=0,
+    model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
+    model.fit(take_batches, steps_per_epoch=ss.steps_per_epoch, epochs=ss.epochs, initial_epoch=2,
               callbacks=[checkpoint_callback, custom_callback])
 
 if False:
