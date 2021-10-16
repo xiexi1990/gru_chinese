@@ -37,26 +37,24 @@ def draw_chars(x, y, model, classes, maxlen, ifshow, fname):
         find = False
         for _i in range(len(x)):
             for _j in range(np.size(x[_i], 0)):
-                if x[_i][_j, 0, 5] == ch:
+                if x[_i][_j, 0] == ch:
                     find = True
                     break
             if find:
                 break
         if not find:
             continue
-        real_char = x[_i][_j, :, :]
+        real_char = y[_i][_j, :, :]
         real_prev_x = 0
         real_prev_y = 0
         for _k in range(1, np.size(real_char, 0)):
-            real_x = real_char[_k, 0]
-            real_y = real_char[_k, 1]
             if (real_char[_k, 2] == 1):
-                real_plt.plot([real_prev_x, real_prev_x + real_x], [real_prev_y, real_prev_y + real_y], color='black')
-            real_prev_x += real_x
-            real_prev_y += real_y
+                real_plt.plot([real_prev_x, real_char[_k, 0]], [real_prev_y, real_char[_k, 1]], color='black')
+            real_prev_x = real_char[_k, 0]
+            real_prev_y = real_char[_k, 1]
 
         model.reset_states()
-        pnt_in = np.array([[[0, 0, 0, 0, 0, ch]]])
+        pnt_in = np.array([[[ch]]])
         pnt_cnt = 0
         prev_x = 0
         prev_y = 0
@@ -99,14 +97,10 @@ def draw_chars(x, y, model, classes, maxlen, ifshow, fname):
             if(s_pred[2] == 1):
                 break
             if(s_pred[0] == 1):
-                ch_plt.plot([prev_x, prev_x + x_pred], [prev_y, prev_y + y_pred], color='black')
+                ch_plt.plot([prev_x, x_pred], [prev_y, y_pred], color='black')
 
-            prev_x += x_pred
-            prev_y += y_pred
-
-            pnt_in[0, 0, 0] = x_pred
-            pnt_in[0, 0, 1] = y_pred
-            pnt_in[0, 0, 2:5] = s_pred
+            prev_x = x_pred
+            prev_y = y_pred
 
             pnt_cnt += 1
         ch_cnt += 1
@@ -125,10 +119,10 @@ if False:
     sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.45)))
     tf.compat.v1.keras.backend.set_session(sess)
 
-    with open(ss.data_path + "x_y_lb2_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), 'rb') as f:
+    with open(ss.data_path + "x_y_lb100_n_" + str(ss.nclass) + "_r_" + str(ss.repeat) + "_dist_" + str(ss.remove_dist_th) + "_ang_" + str(ss.remove_ang_th) + "_drop_" + str(ss.drop) + "_np_" + str(ss.noise_prob) + "_nr_" + str(ss.noise_ratio), 'rb') as f:
         x, y = pickle.load(f)
 
 
-    model = construct_model(ss.units, ss.nclass, ss.tanh_dim, ss.M, True, [1, 1, 6])
-    model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
+    model = construct_model(ss.units, ss.nclass, ss.M, True, [1, 1, 1])
+  #  model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
     draw_chars(x, y, model, [0, 1, 2, 3, 4], 50, True, 'testfig')
