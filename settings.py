@@ -12,4 +12,4 @@ steps_per_epoch = 2000
 epochs = 500
 pot_files_path = "e:/tf_projects/Pot1.1Train/"
 data_path = "data/"
-checkpoint_path = "ckp103_u_" + str(units) + "_n_" + str(nclass) + "_M_" + str(M) + "/"
+checkpoint_path = "ckp104_u_" + str(units) + "_n_" + str(nclass) + "_M_" + str(M) + "/"

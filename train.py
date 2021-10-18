@@ -78,7 +78,7 @@ if True:
             draw_chars(x, y, self.model2, [0, 1, 2, 3, 4], 50, False, self.ckp_path + 'epoch_' + str(epoch + 1))
 
 
-    rnn_cell = SGRUCell(units=ss.units, nclass=ss.nclass)
+    rnn_cell = SGRUCell(units=ss.units, nclass=ss.nclass, M=ss.M)
     rnn_layer = tf.keras.layers.RNN(rnn_cell, return_state=False, return_sequences=True, stateful=False)
     postprocess = PostProcess(M=ss.M)
 
@@ -94,6 +94,6 @@ if True:
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=ss.checkpoint_path + 'ck_{epoch}', save_weights_only=True)
     custom_callback = CustomCallback(construct_model(ss.units, ss.nclass, ss.M, True, [1, 1, 1]), ss.checkpoint_path)
     model.run_eagerly = False
-#    model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
-    model.fit(take_batches, steps_per_epoch=ss.steps_per_epoch, epochs=ss.epochs, initial_epoch=0,
+    model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
+    model.fit(take_batches, steps_per_epoch=ss.steps_per_epoch, epochs=ss.epochs, initial_epoch=4,
               callbacks=[checkpoint_callback, custom_callback])

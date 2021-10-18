@@ -10,9 +10,9 @@ class PostProcess(keras.layers.Layer):
         super(PostProcess, self).__init__(**kwargs)
         self.M = M
     def build(self, input_shape):
-        input_dim = input_shape[-1] - 2
-        self.Wgmm = self.add_weight(shape=(input_dim, self.M * 5), initializer='glorot_uniform', name='Wgmm')
-        self.bgmm = self.add_weight(shape=(self.M * 5), initializer='zeros', name='bgmm')
+        input_dim = input_shape[-1] - self.M * 3 - 2
+        self.Wgmm_part2 = self.add_weight(shape=(input_dim, self.M * 2), initializer='glorot_uniform', name='Wgmm_part2')
+        self.bgmm_part2 = self.add_weight(shape=(self.M * 2), initializer='zeros', name='bgmm_part2')
         self.Wsoftmax = self.add_weight(shape=(input_dim, 3), initializer='glorot_uniform', name='Wsoftmax')
         self.bsoftmax = self.add_weight(shape=(3), initializer='zeros', name='bsoftmax')
 
@@ -20,17 +20,12 @@ class PostProcess(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         tf.debugging.assert_all_finite(inputs, 'postprocess inputs ill')
 
-        R5M = tf.matmul(inputs[:, :, :-2], self.Wgmm) + self.bgmm
-        _pi = R5M[:, :, :self.M]
-        pi = exp_safe(_pi) / tf.reduce_sum(exp_safe(_pi), axis=-1, keepdims=True)
-        mux = R5M[:, :, self.M:self.M * 2]
-        muy = R5M[:, :, self.M * 2:self.M * 3]
-        sigmax = exp_safe(R5M[:, :, self.M * 3:self.M * 4])
-        sigmay = exp_safe(R5M[:, :, self.M * 4:])
-        R3 = tf.matmul(inputs[:, :, :-2], self.Wsoftmax) + self.bsoftmax
+        sigmaxy = tf.matmul(inputs[:, :, :-(self.M * 3 + 2)], self.Wgmm_part2) + self.bgmm_part2
+
+        R3 = tf.matmul(inputs[:, :, :-(self.M * 3 + 2)], self.Wsoftmax) + self.bsoftmax
         p = exp_safe(R3) / tf.reduce_sum(exp_safe(R3), axis=-1, keepdims=True)
 
-        return tf.concat([pi, mux, muy, sigmax, sigmay, p, inputs[:, :, -2:]], axis=-1)
+        return tf.concat([inputs[:, :, -(self.M * 3 + 2):-2], sigmaxy, p, inputs[:, :, -2:]], axis=-1)
     def get_config(self):
         config = super(PostProcess, self).get_config()
         config.update({"M": self.M})
