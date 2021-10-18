@@ -61,8 +61,8 @@ def draw_chars(x, y, model, classes, maxlen, ifshow, fname):
 
         while pnt_cnt < maxlen:
             pred = np.squeeze(model(pnt_in))
-            pi, mux, muy, sigmax, sigmay = np.split(pred[:-3], 5, axis=-1)
-            p = pred[-3:]
+            pi, mux, muy, sigmax, sigmay = np.split(pred[:-5], 5, axis=-1)
+            p = pred[-5:-2]
 
             sum_choose = True
             N_choose = 0
@@ -124,5 +124,5 @@ if False:
 
 
     model = construct_model(ss.units, ss.nclass, ss.M, True, [1, 1, 1])
-  #  model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
+    model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
     draw_chars(x, y, model, [0, 1, 2, 3, 4], 50, True, 'testfig')

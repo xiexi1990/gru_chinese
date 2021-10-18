@@ -13,14 +13,17 @@ def N(x, mu, sigma):
 
 def Loss(y, pred):
     tf.debugging.assert_all_finite(pred, 'loss inputs ill')
-    pi, mux, muy, sigmax, sigmay,  = tf.split(pred[:, :, :-3], 5, axis=-1)
-    p = pred[:, :, -3:]
+    pi, mux, muy, sigmax, sigmay,  = tf.split(pred[:, :, :-5], 5, axis=-1)
+    p = pred[:, :, -5:-2]
     xtp1 = tf.expand_dims(y[:, :, 0], axis=-1)
     ytp1 = tf.expand_dims(y[:, :, 1], axis=-1)
     stp1 = y[:, :, 2:5]
-    w = tf.constant([1, 5, 100], dtype=tf.float32)
+    w = tf.constant([2.5, 5, 100], dtype=tf.float32)
 
+    x_pred = tf.expand_dims(pred[:, :, -2], axis=-1)
+    y_pred = tf.expand_dims(pred[:, :, -1], axis=-1)
     lPd = log_safe(tf.reduce_sum(pi * N(xtp1, mux, sigmax) * N(ytp1, muy, sigmay), axis=-1))
     lPs = tf.reduce_sum(w * stp1 * log_safe(p), axis=-1)
+    lxy = tf.reduce_sum(tf.square(xtp1 - x_pred) + tf.square(ytp1 - y_pred), axis=-1)
 
-    return - (lPd + lPs)
+    return - (lPd + lPs) + lxy * 0.01

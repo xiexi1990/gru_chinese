@@ -88,12 +88,12 @@ if True:
     model = CustomModel(inputs, outputs)
 
    # optimizer = keras.optimizers.SGD(lr=0.001, momentum=0.9, nesterov=True)
-    model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.001))
+    model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.0001))
   #  model.compile(optimizer=optimizer)
 
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=ss.checkpoint_path + 'ck_{epoch}', save_weights_only=True)
     custom_callback = CustomCallback(construct_model(ss.units, ss.nclass, ss.M, True, [1, 1, 1]), ss.checkpoint_path)
     model.run_eagerly = False
-    model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
-    model.fit(take_batches, steps_per_epoch=ss.steps_per_epoch, epochs=ss.epochs, initial_epoch=30,
+#    model.load_weights(tf.train.latest_checkpoint(ss.checkpoint_path))
+    model.fit(take_batches, steps_per_epoch=ss.steps_per_epoch, epochs=ss.epochs, initial_epoch=0,
               callbacks=[checkpoint_callback, custom_callback])
